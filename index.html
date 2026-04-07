@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AWS Cloud Practitioner — Progress Tracker</title>
+<style>
+  :root {
+    --bg:#f7f7f5;--surface:#fff;--border:#e5e3dd;--border2:#d0cec7;
+    --text:#1a1a18;--muted:#6b6963;--hint:#9b9890;
+    --accent:#e8870a;--accent-bg:#fef3e2;--accent-text:#92500a;
+    --blue:#185fa5;--blue-bg:#e6f1fb;--blue-text:#0c447c;
+    --green:#1d9e75;--green-bg:#e1f5ee;--green-text:#085041;
+    --amber:#ba7517;--amber-bg:#faeeda;--amber-text:#633806;
+    --red:#993c1d;--red-bg:#faece7;--red-text:#712b13;
+    --radius:10px;--radius-sm:6px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.6;}
+  .container{max-width:900px;margin:0 auto;padding:28px 20px;}
+
+  /* HEADER */
+  header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;}
+  header h1{font-size:22px;font-weight:600;letter-spacing:-0.3px;}
+  header p{font-size:13px;color:var(--muted);margin-top:3px;}
+  .badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:500;padding:3px 10px;border-radius:999px;}
+  .badge.live{background:var(--green-bg);color:var(--green-text);}
+  .badge.offline{background:#f0f0ee;color:var(--muted);}
+
+  /* MODE BAR */
+  .mode-bar{display:flex;align-items:center;justify-content:space-between;background:var(--accent-bg);border:1px solid #f0d090;border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;font-size:13px;color:var(--accent-text);}
+  .mode-bar.hidden{display:none;}
+
+  /* READONLY BANNER */
+  .readonly-bar{display:flex;align-items:center;justify-content:space-between;background:var(--blue-bg);border:1px solid #b5d4f4;border-radius:var(--radius);padding:10px 16px;margin-bottom:16px;font-size:13px;color:var(--blue-text);}
+  .readonly-bar.hidden{display:none;}
+
+  /* PIN MODAL */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:200;}
+  .overlay.hidden{display:none;}
+  .modal{background:var(--surface);border-radius:var(--radius);padding:28px 28px 24px;width:300px;}
+  .modal h2{font-size:17px;font-weight:600;margin-bottom:6px;}
+  .modal p{font-size:13px;color:var(--muted);margin-bottom:18px;}
+  .pin-row{display:flex;gap:10px;justify-content:center;margin-bottom:14px;}
+  .pin-row input{width:52px;height:52px;text-align:center;font-size:24px;font-weight:600;border:1.5px solid var(--border2);border-radius:var(--radius-sm);background:var(--bg);color:var(--text);}
+  .pin-row input:focus{outline:none;border-color:var(--accent);}
+  .pin-err{font-size:12px;color:var(--red);text-align:center;min-height:16px;margin-bottom:10px;}
+  .mbtns{display:flex;gap:8px;}
+  .btn{padding:8px 18px;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;flex:1;}
+  .btn-primary{background:var(--accent);color:white;}
+  .btn-ghost{background:none;border:1px solid var(--border2);color:var(--muted);}
+  .btn-sm{padding:5px 14px;font-size:12px;font-weight:500;border-radius:var(--radius-sm);cursor:pointer;border:1px solid;}
+  .btn-sm.orange{border-color:var(--accent);color:var(--accent);background:white;}
+  .btn-sm.orange:hover{background:var(--accent);color:white;}
+  .btn-sm.blue{border-color:var(--blue);color:var(--blue);background:white;}
+  .btn-sm.muted{border-color:var(--border2);color:var(--muted);background:transparent;}
+  .btn-sm.muted:hover{background:var(--border);}
+
+  /* STATS */
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;}
+  .stat .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px;}
+  .stat .val{font-size:26px;font-weight:600;letter-spacing:-0.5px;}
+  .stat .sub{font-size:11px;color:var(--hint);margin-top:2px;}
+
+  /* OVERALL BAR */
+  .overall{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:20px;}
+  .bar-wrap{background:#eeece8;border-radius:999px;overflow:hidden;height:8px;}
+  .bar-fill{height:100%;border-radius:999px;transition:width 0.5s ease;}
+
+  /* TABS */
+  .tabs{display:flex;gap:4px;margin-bottom:20px;border-bottom:1px solid var(--border);}
+  .tab{padding:8px 16px;font-size:13px;font-weight:500;color:var(--muted);cursor:pointer;border:none;background:none;border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab.active{color:var(--text);border-bottom-color:var(--accent);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* DOMAINS */
+  .domain{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:14px;}
+  .domain-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px;}
+  .subtopics{margin-top:12px;border-top:1px solid var(--border);padding-top:8px;}
+  .subtopic{display:flex;align-items:flex-start;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);}
+  .subtopic:last-child{border-bottom:none;}
+  .subtopic input[type=checkbox]{margin-top:2px;flex-shrink:0;width:15px;height:15px;}
+  .subtopic label{font-size:13px;color:var(--text);flex:1;}
+  .subtopic.done label{text-decoration:line-through;color:var(--hint);}
+  .subtopic.locked input{pointer-events:none;opacity:0.5;}
+  .subtopic.locked label{cursor:default;}
+  .subtopic.unlocked input{cursor:pointer;}
+  .subtopic.unlocked label{cursor:pointer;}
+
+  /* PLAN */
+  .week{margin-bottom:20px;}
+  .week-lbl{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+  .day-row{display:flex;align-items:flex-start;gap:14px;padding:10px 0;border-bottom:1px solid var(--border);}
+  .day-row:last-child{border-bottom:none;}
+  .day-date{font-size:12px;font-weight:600;color:var(--muted);min-width:90px;padding-top:1px;}
+  .day-date.today{color:var(--accent);}
+  .day-title{font-size:13px;font-weight:600;margin-bottom:2px;}
+  .day-desc{font-size:12px;color:var(--muted);}
+  .day-tag{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:999px;margin-right:4px;margin-top:4px;}
+  .day-past{opacity:0.5;}
+  .day-today{background:#fff8e6;border-radius:var(--radius-sm);border:1px solid #f0d090;padding:10px 12px;margin:0 -2px;}
+
+  /* LOG */
+  .log-form{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 20px;margin-bottom:16px;}
+  .log-form.locked{display:none;}
+  .form-lbl{font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.4px;display:block;margin-bottom:6px;}
+  textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;resize:vertical;min-height:80px;background:var(--bg);color:var(--text);font-family:inherit;}
+  textarea:focus{outline:none;border-color:var(--accent);}
+  input[type=number],select{padding:8px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;background:var(--bg);color:var(--text);}
+  .form-row{display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;}
+  .log-entry{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:10px;}
+  .log-meta{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:6px;}
+  .log-date{font-size:12px;font-weight:600;color:var(--muted);}
+  .log-pill{font-size:11px;padding:2px 8px;border-radius:999px;font-weight:500;}
+  .log-text{font-size:13px;color:var(--text);}
+  .log-del{font-size:11px;color:var(--hint);cursor:pointer;background:none;border:none;padding:0;}
+  .log-del:hover{color:var(--red);}
+  .log-del.hidden{display:none;}
+  .empty{text-align:center;padding:2rem;color:var(--hint);font-size:13px;}
+
+  @media(max-width:600px){
+    .stats{grid-template-columns:repeat(2,1fr);}
+    .domain-header{flex-direction:column;align-items:flex-start;}
+  }
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--text);color:white;padding:10px 20px;border-radius:999px;font-size:13px;font-weight:500;z-index:300;opacity:0;transition:opacity 0.3s;pointer-events:none;}
+  .toast.show{opacity:1;}
+</style>
+</head>
+<body>
+
+<!-- PIN MODAL -->
+<div class="overlay hidden" id="pin-overlay">
+  <div class="modal">
+    <h2>Enter your PIN</h2>
+    <p>Enter your 4-digit PIN to enable editing.</p>
+    <div class="pin-row">
+      <input type="password" maxlength="1" id="p1" inputmode="numeric" pattern="[0-9]">
+      <input type="password" maxlength="1" id="p2" inputmode="numeric" pattern="[0-9]">
+      <input type="password" maxlength="1" id="p3" inputmode="numeric" pattern="[0-9]">
+      <input type="password" maxlength="1" id="p4" inputmode="numeric" pattern="[0-9]">
+    </div>
+    <div class="pin-err" id="pin-err"></div>
+    <div class="mbtns">
+      <button class="btn btn-ghost" onclick="closePin()">Cancel</button>
+      <button class="btn btn-primary" onclick="submitPin()">Unlock</button>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- HEADER -->
+  <header>
+    <div>
+      <h1>AWS Cloud Practitioner Tracker</h1>
+      <p>April 7 – 30, 2026 &nbsp;·&nbsp; 18 study days &nbsp;·&nbsp; Target: certified by May 1</p>
+    </div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="save-status" style="font-size:12px;min-width:70px;text-align:right"></span>
+        <span class="badge offline" id="sync-badge">● connecting…</span>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="mode-label" style="font-size:12px;color:var(--muted)">View only</span>
+        <button class="btn-sm orange" id="unlock-btn" onclick="openPin()">🔒 Edit mode</button>
+        <button class="btn-sm muted hidden" id="lock-btn" onclick="lockEditor()">Lock</button>
+      </div>
+    </div>
+  </header>
+
+  <!-- MODE BARS -->
+  <div class="mode-bar hidden" id="edit-bar">
+    <span>✏️ &nbsp;<strong>Edit mode on</strong> — your changes save and sync automatically.</span>
+    <button class="btn-sm muted" onclick="lockEditor()">Lock editing</button>
+  </div>
+  <div class="readonly-bar" id="view-bar">
+    <span>👁 &nbsp;<strong>View mode</strong> — you are viewing live progress. Only the owner can make changes.</span>
+  </div>
+
+  <!-- KEY HINT (shown on save fail) -->
+  <div id="key-hint" class="hidden" style="background:#faece7;border:1px solid #f0b090;border-radius:var(--radius);padding:10px 16px;margin-bottom:14px;font-size:13px;color:var(--red-text);">
+    ⚠️ <strong>Changes are not saving.</strong> Your API key may have been rotated. Open <code>index.html</code> in Notepad, update <code>const MASTER_KEY</code> with your current key from JSONBin, and re-upload to GitHub.
+  </div>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><div class="lbl">Overall progress</div><div class="val" id="s-pct">0%</div><div class="sub" id="s-topics">0 of 24 topics</div></div>
+    <div class="stat"><div class="lbl">Study hours</div><div class="val" id="s-hrs">0h</div><div class="sub" id="s-avg">Log to track avg</div></div>
+    <div class="stat"><div class="lbl">Days studied</div><div class="val" id="s-days">0</div><div class="sub">Weekdays left: <span id="s-rem">18</span></div></div>
+    <div class="stat"><div class="lbl">Exam countdown</div><div class="val" id="s-cd">—</div><div class="sub">Target: May 1, 2026</div></div>
+  </div>
+
+  <!-- OVERALL BAR -->
+  <div class="overall">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span style="font-size:13px;color:var(--muted);min-width:110px;">Overall progress</span>
+      <div class="bar-wrap" style="flex:1"><div class="bar-fill" id="main-bar" style="width:0%;background:var(--green)"></div></div>
+      <span style="font-size:13px;font-weight:600;min-width:36px;text-align:right" id="main-pct">0%</span>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('progress',this)">Domain Progress</button>
+    <button class="tab" onclick="showTab('plan',this)">Study Plan</button>
+    <button class="tab" onclick="showTab('log',this)">Daily Log</button>
+  </div>
+
+  <!-- TAB: PROGRESS -->
+  <div class="tab-panel active" id="tab-progress">
+    <div id="domains-container"></div>
+    <button class="btn-sm muted" id="reset-btn" style="margin-top:6px;display:none" onclick="confirmReset()">Reset all progress</button>
+  </div>
+
+  <!-- TAB: PLAN -->
+  <div class="tab-panel" id="tab-plan">
+    <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">Your 18-day personalised study schedule — weekdays only, April 7–30. Aim for 1.5–2 hours per day.</p>
+    <div id="plan-container"></div>
+  </div>
+
+  <!-- TAB: LOG -->
+  <div class="tab-panel" id="tab-log">
+    <div class="log-form locked" id="log-form">
+      <label class="form-lbl">Today's update</label>
+      <textarea id="log-text" placeholder="What did you study? Any blockers? Topics completed or found tricky?"></textarea>
+      <div class="form-row">
+        <input type="number" id="log-hours" min="0" max="12" step="0.5" placeholder="Hours studied" style="width:150px">
+        <select id="log-domain">
+          <option value="">Tag a domain (optional)</option>
+          <option>Cloud Concepts</option>
+          <option>Security &amp; Compliance</option>
+          <option>Cloud Technology &amp; Services</option>
+          <option>Billing, Pricing &amp; Support</option>
+          <option>Practice / Revision</option>
+        </select>
+        <button class="btn btn-primary" style="flex:0;padding:8px 20px" onclick="addLog()">Post update</button>
+      </div>
+    </div>
+    <div id="log-container"></div>
+  </div>
+
+</div>
+
+<script>
+// ── HARDCODED CONFIG ───────────────────────────────────────────────────────
+const MASTER_KEY = '$2a$10$x6VpaGn.uWRbUzsAisKYKeGxJYPr1g0XdhvUmSy4PHl9Bw1mcsdom';
+const BIN_ID     = '69d4b4db856a682189088612';
+const PIN        = '2604'; // Your edit PIN — change this line to update it
+
+// ── DATA ──────────────────────────────────────────────────────────────────
+const DOMAINS = [
+  { id:'d1', name:'Cloud Concepts', weight:26, color:'var(--blue)', bg:'var(--blue-bg)', tc:'var(--blue-text)',
+    subtopics:['Define cloud computing and its key benefits','AWS global infrastructure (Regions, AZs, Edge Locations)','Cloud deployment models: public, private, hybrid','Cloud economics, CAPEX vs OPEX, pricing models','AWS Well-Architected Framework — 6 pillars overview'] },
+  { id:'d2', name:'Security & Compliance', weight:25, color:'var(--green)', bg:'var(--green-bg)', tc:'var(--green-text)',
+    subtopics:['Shared Responsibility Model in depth','IAM: users, groups, roles, policies, MFA','AWS security services: Shield, WAF, GuardDuty, Inspector','Compliance programs: GDPR, HIPAA, PCI DSS on AWS','Data protection: KMS, CloudHSM, encryption at rest and transit'] },
+  { id:'d3', name:'Cloud Technology & Services', weight:33, color:'var(--amber)', bg:'var(--amber-bg)', tc:'var(--amber-text)',
+    subtopics:['Compute: EC2 types, Lambda, Elastic Beanstalk, ECS/EKS','Storage: S3 tiers, EBS, EFS, Glacier, Storage Gateway','Databases: RDS, Aurora, DynamoDB, ElastiCache, Redshift','Networking: VPC, subnets, Security Groups, Route 53, CloudFront','Management & monitoring: CloudWatch, CloudTrail, Config, Trusted Advisor','Migration tools: DMS, SMS, Snowball, AWS Migration Hub'] },
+  { id:'d4', name:'Billing, Pricing & Support', weight:16, color:'var(--red)', bg:'var(--red-bg)', tc:'var(--red-text)',
+    subtopics:['AWS pricing models: On-Demand, Reserved, Spot, Savings Plans','Cost tools: Pricing Calculator, Cost Explorer, Budgets, CUR','AWS support plans: Basic, Developer, Business, Enterprise','Consolidated billing and AWS Organizations','TCO Calculator and cloud value framework'] }
+];
+
+const PLAN = [
+  {date:'Apr 7 (Mon)',  title:'Cloud fundamentals & AWS overview',          desc:'What is cloud computing, key advantages, types of cloud. AWS history and global footprint.',                                  tags:['Cloud Concepts'], bg:'var(--blue-bg)',  tc:'var(--blue-text)'},
+  {date:'Apr 8 (Tue)',  title:'Global infrastructure & deployment models',   desc:'Regions, Availability Zones, Edge Locations. Public, private, hybrid cloud models.',                                        tags:['Cloud Concepts'], bg:'var(--blue-bg)',  tc:'var(--blue-text)'},
+  {date:'Apr 9 (Wed)',  title:'Cloud economics & Well-Architected Framework',desc:'CAPEX vs OPEX, pricing models, 6 pillars of Well-Architected. Do 10 practice questions.',                                    tags:['Cloud Concepts'], bg:'var(--blue-bg)',  tc:'var(--blue-text)'},
+  {date:'Apr 10 (Thu)', title:'Shared Responsibility Model & IAM basics',    desc:'Who secures what. IAM users, groups, roles, policies. Enable MFA everywhere.',                                              tags:['Security'],       bg:'var(--green-bg)', tc:'var(--green-text)'},
+  {date:'Apr 11 (Fri)', title:'IAM advanced + AWS security services',        desc:'IAM policies deep dive. Shield, WAF, GuardDuty, Inspector, Macie, Security Hub.',                                          tags:['Security'],       bg:'var(--green-bg)', tc:'var(--green-text)'},
+  {date:'Apr 14 (Mon)', title:'Compliance & data protection',                desc:'GDPR, HIPAA, PCI DSS on AWS. KMS, CloudHSM, encryption in transit and at rest.',                                           tags:['Security'],       bg:'var(--green-bg)', tc:'var(--green-text)'},
+  {date:'Apr 15 (Tue)', title:'Compute services deep dive',                  desc:'EC2 instance types, pricing, auto-scaling. Lambda functions. Elastic Beanstalk, ECS/EKS overview.',                        tags:['Technology'],     bg:'var(--amber-bg)', tc:'var(--amber-text)'},
+  {date:'Apr 16 (Wed)', title:'Storage services',                            desc:'S3 storage classes and lifecycle. EBS, EFS, Glacier. Storage Gateway. S3 pricing.',                                        tags:['Technology'],     bg:'var(--amber-bg)', tc:'var(--amber-text)'},
+  {date:'Apr 17 (Thu)', title:'Database services',                           desc:'RDS vs DynamoDB vs Aurora vs Redshift. ElastiCache. When to use which database.',                                           tags:['Technology'],     bg:'var(--amber-bg)', tc:'var(--amber-text)'},
+  {date:'Apr 18 (Fri)', title:'Week 2 review & practice quiz',               desc:'Revise Compute, Storage, Databases. Do 20 practice questions. Note weak areas.',                                           tags:['Review'],         bg:'#f0f0ee',         tc:'var(--muted)'},
+  {date:'Apr 21 (Mon)', title:'Networking: VPC & connectivity',              desc:'VPC, subnets, route tables, internet gateways, NAT, Security Groups vs NACLs, VPN, Direct Connect.',                       tags:['Technology'],     bg:'var(--amber-bg)', tc:'var(--amber-text)'},
+  {date:'Apr 22 (Tue)', title:'Route 53, CloudFront & other services',       desc:'DNS, CloudFront CDN, API Gateway, SQS, SNS, CloudFormation, Elastic Load Balancer.',                                       tags:['Technology'],     bg:'var(--amber-bg)', tc:'var(--amber-text)'},
+  {date:'Apr 23 (Wed)', title:'Monitoring, management & migration',          desc:'CloudWatch, CloudTrail, Config, Trusted Advisor. Snowball, DMS, Migration Hub.',                                           tags:['Technology'],     bg:'var(--amber-bg)', tc:'var(--amber-text)'},
+  {date:'Apr 24 (Thu)', title:'Pricing models & cost tools',                 desc:'On-Demand, Reserved, Spot, Savings Plans. Pricing Calculator, Cost Explorer, Budgets, CUR.',                               tags:['Billing'],        bg:'var(--red-bg)',   tc:'var(--red-text)'},
+  {date:'Apr 25 (Fri)', title:'Support plans & Organizations',               desc:'Basic, Developer, Business, Enterprise support. Consolidated billing. AWS Organizations. TCO Calculator.',                  tags:['Billing'],        bg:'var(--red-bg)',   tc:'var(--red-text)'},
+  {date:'Apr 28 (Mon)', title:'Full practice exam #1',                       desc:'Take a timed 65-question mock exam on AWS Skill Builder or Udemy. Review every wrong answer carefully.',                   tags:['Exam Prep'],      bg:'#fff8e6',         tc:'#7a5200'},
+  {date:'Apr 29 (Tue)', title:'Targeted revision of weak areas',             desc:'Focus only on domains where you scored below 70% in practice exam. Re-read, re-test.',                                     tags:['Exam Prep'],      bg:'#fff8e6',         tc:'#7a5200'},
+  {date:'Apr 30 (Wed)', title:'Full practice exam #2 + final prep',          desc:'Second timed mock exam. Light review only — no new topics. Rest well tonight. You\'re ready.',                             tags:['Exam Prep'],      bg:'#fff8e6',         tc:'#7a5200'},
+];
+
+const PLAN_DATES = ['2026-04-07','2026-04-08','2026-04-09','2026-04-10','2026-04-11',
+                    '2026-04-14','2026-04-15','2026-04-16','2026-04-17','2026-04-18',
+                    '2026-04-21','2026-04-22','2026-04-23','2026-04-24','2026-04-25',
+                    '2026-04-28','2026-04-29','2026-04-30'];
+
+let appData = {checked:{}, logs:[], totalHours:0, startDate:'2026-04-07'};
+let editMode = false;
+let isPushing = false;
+let syncTimer = null;
+
+// ── JSONBIN ───────────────────────────────────────────────────────────────
+async function jbGet() {
+  try {
+    const r = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`,{headers:{'X-Master-Key':MASTER_KEY}});
+    if (!r.ok) return null;
+    return (await r.json()).record;
+  } catch { return null; }
+}
+async function jbSet(data) {
+  try {
+    const r = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`,{
+      method:'PUT',headers:{'Content-Type':'application/json','X-Master-Key':MASTER_KEY},
+      body:JSON.stringify(data)
+    });
+    return r.ok;
+  } catch { return false; }
+}
+function setBadge(live) {
+  const b = document.getElementById('sync-badge');
+  b.textContent = live ? '● live' : '● offline';
+  b.className = 'badge ' + (live ? 'live' : 'offline');
+}
+function setSaveStatus(msg, color) {
+  const el = document.getElementById('save-status');
+  if (!el) return;
+  el.textContent = msg;
+  el.style.color = color || 'var(--muted)';
+}
+async function sync() {
+  if (isPushing) return; // don't overwrite mid-save
+  const remote = await jbGet();
+  if (remote) { appData = remote; renderAll(); setBadge(true); }
+  else setBadge(false);
+}
+async function push() {
+  isPushing = true;
+  setSaveStatus('Saving…', 'var(--muted)');
+  const ok = await jbSet(appData);
+  isPushing = false;
+  if (ok) {
+    setBadge(true);
+    showToast('✓ Saved successfully', 'var(--green)');
+  } else {
+    setBadge(false);
+    showToast('✗ Save failed — check your API key in JSONBin', 'var(--red)');
+  }
+}
+
+// ── PIN ───────────────────────────────────────────────────────────────────
+function openPin() {
+  ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pin-err').textContent='';
+  document.getElementById('pin-overlay').classList.remove('hidden');
+  document.getElementById('p1').focus();
+}
+function closePin() { document.getElementById('pin-overlay').classList.add('hidden'); }
+function submitPin() {
+  const entered = ['p1','p2','p3','p4'].map(id=>document.getElementById(id).value).join('');
+  if (entered === PIN) { closePin(); enableEdit(); }
+  else { document.getElementById('pin-err').textContent = 'Incorrect PIN. Try again.'; ['p1','p2','p3','p4'].forEach(id=>document.getElementById(id).value=''); document.getElementById('p1').focus(); }
+}
+// Auto-advance PIN inputs
+['p1','p2','p3','p4'].forEach((id,i,arr)=>{
+  document.getElementById(id).addEventListener('input',function(){
+    if(this.value && i<arr.length-1) document.getElementById(arr[i+1]).focus();
+    if(this.value && i===arr.length-1) submitPin();
+  });
+  document.getElementById(id).addEventListener('keydown',function(e){
+    if(e.key==='Backspace'&&!this.value&&i>0) document.getElementById(arr[i-1]).focus();
+  });
+});
+
+function enableEdit() {
+  editMode = true;
+  document.getElementById('edit-bar').classList.remove('hidden');
+  document.getElementById('view-bar').classList.add('hidden');
+  document.getElementById('unlock-btn').classList.add('hidden');
+  document.getElementById('lock-btn').classList.remove('hidden');
+  document.getElementById('mode-label').textContent = 'Edit mode';
+  document.getElementById('log-form').classList.remove('locked');
+  document.getElementById('reset-btn').style.display = 'inline-block';
+  renderDomains();
+}
+function lockEditor() {
+  editMode = false;
+  document.getElementById('edit-bar').classList.add('hidden');
+  document.getElementById('view-bar').classList.remove('hidden');
+  document.getElementById('unlock-btn').classList.remove('hidden');
+  document.getElementById('lock-btn').classList.add('hidden');
+  document.getElementById('mode-label').textContent = 'View only';
+  document.getElementById('log-form').classList.add('locked');
+  document.getElementById('reset-btn').style.display = 'none';
+  renderDomains();
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────
+function renderAll() { renderStats(); renderDomains(); renderPlan(); renderLog(); }
+
+function totalTopics() { return DOMAINS.reduce((a,d)=>a+d.subtopics.length,0); }
+function doneTopics()  { return DOMAINS.reduce((a,d)=>a+d.subtopics.filter((_,i)=>appData.checked[d.id+'_'+i]).length,0); }
+function domainPct(d)  { return Math.round(d.subtopics.filter((_,i)=>appData.checked[d.id+'_'+i]).length/d.subtopics.length*100); }
+
+function renderStats() {
+  const tot=totalTopics(), done=doneTopics(), pct=Math.round(done/tot*100);
+  document.getElementById('s-pct').textContent    = pct+'%';
+  document.getElementById('s-topics').textContent = done+' of '+tot+' topics done';
+  document.getElementById('s-hrs').textContent    = appData.totalHours+'h';
+  const days = new Set((appData.logs||[]).map(l=>l.date)).size;
+  document.getElementById('s-days').textContent   = days;
+  document.getElementById('s-avg').textContent    = days ? (appData.totalHours/days).toFixed(1)+'h avg / day' : 'Log to track avg';
+  const rem = Math.max(0,Math.ceil((new Date('2026-05-01')-new Date())/(864e5)));
+  document.getElementById('s-cd').textContent     = rem+'d';
+  const today = new Date().toISOString().split('T')[0];
+  const ti = PLAN_DATES.indexOf(today);
+  document.getElementById('s-rem').textContent    = Math.max(0, 18-(ti<0?18:ti));
+  document.getElementById('main-bar').style.width = pct+'%';
+  document.getElementById('main-pct').textContent = pct+'%';
+}
+
+function renderDomains() {
+  const c = document.getElementById('domains-container'); c.innerHTML='';
+  DOMAINS.forEach(d => {
+    const pct = domainPct(d);
+    const el = document.createElement('div'); el.className='domain';
+    el.innerHTML=`
+      <div class="domain-header">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="background:${d.bg};color:${d.tc};font-size:11px;font-weight:600;padding:3px 10px;border-radius:999px">${d.name}</span>
+          <span style="font-size:12px;color:var(--muted)">Exam weight ${d.weight}%</span>
+        </div>
+        <span style="font-size:13px;color:var(--muted)">${pct}%</span>
+      </div>
+      <div class="bar-wrap"><div class="bar-fill" style="width:${pct}%;background:${d.color}"></div></div>
+      <div class="subtopics">
+        ${d.subtopics.map((t,i)=>{
+          const key=d.id+'_'+i, ck=appData.checked[key];
+          const cls = editMode ? 'unlocked' : 'locked';
+          return `<div class="subtopic ${ck?'done':''} ${cls}">
+            <input type="checkbox" id="cb_${d.id}_${i}" ${ck?'checked':''} onchange="toggleTopic('${d.id}',${i},this)">
+            <label for="cb_${d.id}_${i}">${t}</label>
+          </div>`;
+        }).join('')}
+      </div>`;
+    c.appendChild(el);
+  });
+}
+
+function renderPlan() {
+  const c=document.getElementById('plan-container'); c.innerHTML='';
+  const today=new Date().toISOString().split('T')[0];
+  const todayIdx=PLAN_DATES.indexOf(today);
+  const weeks=[
+    {label:'Week 1 — Apr 7–11 · Cloud Concepts & Security (part 1)', days:PLAN.slice(0,5),  offset:0},
+    {label:'Week 2 — Apr 14–18 · Security (part 2) & Core Services', days:PLAN.slice(5,10), offset:5},
+    {label:'Week 3 — Apr 21–25 · Networking, Billing & Management',  days:PLAN.slice(10,15),offset:10},
+    {label:'Week 4 — Apr 28–30 · Practice Exams & Final Prep',       days:PLAN.slice(15),   offset:15},
+  ];
+  weeks.forEach(w=>{
+    const wd=document.createElement('div'); wd.className='week';
+    wd.innerHTML=`<div class="week-lbl">${w.label}</div>`;
+    w.days.forEach((day,i)=>{
+      const idx=w.offset+i;
+      const isToday=idx===todayIdx, isPast=idx<todayIdx;
+      const row=document.createElement('div');
+      row.className='day-row'+(isPast?' day-past':'')+(isToday?' day-today':'');
+      row.innerHTML=`
+        <div class="day-date${isToday?' today':''}">${day.date}${isToday?' ← today':''}</div>
+        <div style="flex:1">
+          <div class="day-title">${day.title}</div>
+          <div class="day-desc">${day.desc}</div>
+          <div>${day.tags.map(t=>`<span class="day-tag" style="background:${day.bg};color:${day.tc}">${t}</span>`).join('')}</div>
+        </div>`;
+      wd.appendChild(row);
+    });
+    c.appendChild(wd);
+  });
+}
+
+function renderLog() {
+  const c=document.getElementById('log-container'); c.innerHTML='';
+  const logs=appData.logs||[];
+  if(!logs.length){c.innerHTML='<div class="empty">No updates yet. Updates posted here will be visible to your manager in real time.</div>';return;}
+  logs.forEach(l=>{
+    const el=document.createElement('div'); el.className='log-entry';
+    el.innerHTML=`
+      <div class="log-meta">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+          <span class="log-date">${l.date} · ${l.time}</span>
+          ${l.domain?`<span class="log-pill" style="background:var(--amber-bg);color:var(--amber-text)">${l.domain}</span>`:''}
+          ${l.hours?`<span class="log-pill" style="background:var(--blue-bg);color:var(--blue-text)">${l.hours}h studied</span>`:''}
+        </div>
+        <button class="log-del${editMode?'':' hidden'}" onclick="deleteLog(${l.id})">remove</button>
+      </div>
+      ${l.note?`<div class="log-text">${l.note}</div>`:''}`;
+    c.appendChild(el);
+  });
+}
+
+// ── ACTIONS ───────────────────────────────────────────────────────────────
+function toggleTopic(did,tidx,cb) {
+  if(!editMode) {
+    // Not in edit mode — revert the checkbox visually and prompt user
+    if(cb) cb.checked = !!appData.checked[did+'_'+tidx];
+    showToast('🔒 Click "Edit mode" and enter your PIN to make changes.', 'var(--amber)');
+    return;
+  }
+  appData.checked[did+'_'+tidx] = cb ? cb.checked : !appData.checked[did+'_'+tidx];
+  renderStats(); push();
+}
+function addLog() {
+  const note=document.getElementById('log-text').value.trim();
+  const hours=parseFloat(document.getElementById('log-hours').value)||0;
+  const domain=document.getElementById('log-domain').value;
+  if(!note&&!hours) return;
+  const now=new Date();
+  appData.logs.unshift({
+    id:Date.now(),
+    date:now.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}),
+    time:now.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}),
+    note,hours,domain
+  });
+  appData.totalHours=Math.round((appData.totalHours+hours)*10)/10;
+  document.getElementById('log-text').value='';
+  document.getElementById('log-hours').value='';
+  document.getElementById('log-domain').value='';
+  renderAll(); push();
+}
+function deleteLog(id) {
+  const e=appData.logs.find(l=>l.id===id);
+  appData.logs=appData.logs.filter(l=>l.id!==id);
+  appData.totalHours=Math.max(0,Math.round((appData.totalHours-(e?.hours||0))*10)/10);
+  renderAll(); push();
+}
+function confirmReset() {
+  if(confirm('Reset ALL progress and logs? This cannot be undone.')) {
+    appData={checked:{},logs:[],totalHours:0,startDate:'2026-04-07'};
+    renderAll(); push();
+  }
+}
+function showTab(id,btn) {
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tab-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='log') renderLog();
+}
+
+// ── TOAST ─────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, bg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.background = bg || 'var(--text)';
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────
+renderAll();
+sync();
+setInterval(sync, 30000);
+</script>
+<div class="toast" id="toast"></div>
+</body>
+</html>
